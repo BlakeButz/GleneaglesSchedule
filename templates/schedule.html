@@ -1,0 +1,12 @@
+<!-- schedule.html -->
+{% extends "base.html" %}
+{% block title %}Updated Schedule{% endblock %}
+{% block content %}
+    <h1 class="mb-4">Current Schedule</h1>
+    {% if data %}
+        <!-- Display the HTML table -->
+        {{ data|safe }}
+    {% else %}
+        <p>There was an error loading the schedule.</p>
+    {% endif %}
+{% endblock %}

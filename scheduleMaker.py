@@ -61,23 +61,10 @@ def generate_schedule(df):
         if len(high_priority_guards) + len(other_guards) < (12 - len(morning_shifts) - len(afternoon_shifts)):
             continue
 
-        # Assign one high-priority guard to each morning and afternoon shift if there are available spots
-        for shift_list, shift_label in [(morning_shifts, morning_shift), (afternoon_shifts, afternoon_shift)]:
-            if len(shift_list) < 6:
-                if high_priority_guards:
-                    guard = high_priority_guards.pop(0)
-                    for idx in range(3, len(df)):  # Start from the 4th row (index 3):
-                        if df.at[idx, day] != 'X' and pd.isna(df.at[idx, day]) and guard.name == df.at[
-                            idx, df.columns[0]]:
-                            df.at[idx, day] = shift_label
-                            guard.add_shift()
-                            shift_list.append(guard)
-                            break
-
         available_guards = high_priority_guards + other_guards
         random.shuffle(available_guards)
 
-        # Assign remaining morning shifts to ensure 6 morning guards
+        # Assign guards to morning shift until there are 6 guards
         while len(morning_shifts) < 6 and available_guards:
             guard = available_guards.pop(0)
             for idx in range(3, len(df)):  # Start from the 4th row (index 3)
@@ -87,7 +74,7 @@ def generate_schedule(df):
                     morning_shifts.append(guard)
                     break
 
-        # Assign remaining afternoon shifts to ensure 6 afternoon guards
+        # Assign guards to afternoon shift until there are 6 guards
         while len(afternoon_shifts) < 6 and available_guards:
             guard = available_guards.pop(0)
             for idx in range(3, len(df)):  # Start from the 4th row (index 3)
@@ -110,6 +97,10 @@ def main():
 
     df = read_excel(input_file)
     updated_df = generate_schedule(df)
+
+    # Drop the 'rank' column from the DataFrame
+    updated_df.drop(columns=['Rank'], inplace=True)
+
     save_excel(updated_df, output_file)
 
 if __name__ == "__main__":

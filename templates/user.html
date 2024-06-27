@@ -1,15 +1,14 @@
 {% extends "base.html" %}
+
 {% block title %}User{% endblock %}
+
 {% block content %}
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            {% for msg in messages %}
-                <p>{{msg}}</p>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-<form action="#" method="POST">
-    <input type="email" name="email" placeholder="Enter Email" value="{{email if email}}"/>
-    <input type="submit" value="submit"/>
-</form>
+    <h2>User Page</h2>
+    <p>Email: {{ email }}</p>
+    <form method="POST" action="/user">
+        <label for="email">Update Email:</label>
+        <input type="email" id="email" name="email" required><br>
+        <button type="submit">Update</button>
+    </form>
+    <a href="{{ url_for('logout') }}">Logout</a>
 {% endblock %}
