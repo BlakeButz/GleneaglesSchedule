@@ -35,11 +35,26 @@
       <li class="nav-item">
         <a class="nav-link" href="{{ url_for('schedule') }}">Schedule</a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('request_time_off') }}">Request Time Off</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('user') }}">View Time Off</a>
+      </li>
     </ul>
   </div>
 </nav>
 
 <div class="container-fluid">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
   {% block content %}
   {% endblock %}
 </div>

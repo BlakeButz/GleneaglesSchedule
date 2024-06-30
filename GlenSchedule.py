@@ -1,8 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from datetime import timedelta
+from datetime import timedelta, datetime
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
 import os
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = "hello"
@@ -13,20 +14,31 @@ app.permanent_session_lifetime = timedelta(days=5)
 db = SQLAlchemy(app)
 
 
-class users(db.Model):
-    _id = db.Column("id", db.Integer, primary_key=True)
-    name = db.Column("name", db.String(100), nullable=False)
-    email = db.Column("email", db.String(100), nullable=False)
-    password = db.Column("password", db.String(100), nullable=False)
+class Users(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(100), nullable=False)
 
-    def __init__(self, name, password, email):
+    def __init__(self, name, email, password):
         self.name = name
-        self.password = password
         self.email = email
+        self.password = generate_password_hash(password)
+
+
+class TimeOffRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    period = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('Users', backref=db.backref('time_off_requests', lazy=True))
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/schedule')
 def schedule():
@@ -42,34 +54,30 @@ def schedule():
 
 @app.route("/view")
 def view():
-    return render_template("view.html", values=users.query.all())
+    users = Users.query.all()
+    return render_template("view.html", users=users)
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        session.permanent = True
-        user = request.form.get('user')
+    if 'user' in session:
+        flash('You are already logged in!', 'info')
+        return redirect(url_for('index'))
 
-        if not user:
-            flash('Username is required.', 'error')
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        user = Users.query.filter_by(name=username).first()
+        if user and check_password_hash(user.password, password):
+            session['user'] = user.name
+            flash('Login successful!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password. Please try again.', 'danger')
             return redirect(url_for('login'))
 
-        session['user'] = user
-
-        found_user = users.query.filter_by(name=user).first()
-        if found_user:
-            session['email'] = found_user.email
-            flash('You were logged in successfully!', 'success')
-            return redirect(url_for('user'))
-        else:
-            flash('User does not exist. Please register.', 'error')
-            return redirect(url_for('register'))
-    else:
-        if "user" in session:
-            flash('Already logged in!', 'info')
-            return redirect(url_for('user'))
-        return render_template("login.html")
+    return render_template('login.html')
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -83,59 +91,85 @@ def register():
             flash('All fields are required.', 'error')
             return redirect(url_for('register'))
 
-        if users.query.filter_by(name=name).first():
+        if Users.query.filter_by(name=name).first():
             flash('Username already exists!', 'error')
             return redirect(url_for('register'))
 
-        new_user = users(name, password, email)
+        new_user = Users(name, email, password)
         db.session.add(new_user)
         db.session.commit()
         flash('You have been registered successfully!', 'success')
         return redirect(url_for('login'))
+
     return render_template('register.html')
 
 
-@app.route('/user', methods=["GET", "POST"])
+@app.route('/user', methods=['GET', 'POST'])
 def user():
-    email = None
-    if "user" in session:
-        user = session['user']
-
-        if request.method == 'POST':
-            email = request.form['email']
-            session['email'] = email
-            found_user = users.query.filter_by(name=user).first()
-            found_user.email = email
-            db.session.commit()
-            flash('Email was Saved!', 'success')
-        else:
-            if 'email' in session:
-                email = session['email']
-        return render_template('user.html', email=email)
-    else:
-        flash('You are not logged in!', 'error')
+    if 'user' not in session:
+        flash('You need to log in to view this page.', 'danger')
         return redirect(url_for('login'))
+
+    user = Users.query.filter_by(name=session['user']).first()
+
+    if request.method == 'POST':
+        email = request.form['email']
+        user.email = email
+        db.session.commit()
+        flash('Email updated successfully.', 'success')
+
+    time_off_requests = TimeOffRequest.query.filter_by(user_id=user.id).all()
+
+    return render_template('user.html', user=user, time_off_requests=time_off_requests)
 
 
 @app.route('/logout')
 def logout():
-    if 'user' in session:
-        user = session['user']
-        flash(f'You have been logged out, {user}', "info")
-        session.pop('user', None)
-        session.pop('email', None)
-    else:
-        flash('You were not logged in!', 'error')
+    session.clear()
+    flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
 
-@app.route('/delete')
+@app.route('/delete', methods=['GET', 'POST'])
 def delete():
-    for user in users.query.all():
+    for time in TimeOffRequest.query.all():
+        db.session.delete(time)
+    for user in Users.query.all():
         db.session.delete(user)
     db.session.commit()
     flash('Users Deleted!', 'info')
-    return render_template("index.html")
+
+    return redirect(url_for('logout'))
+
+
+@app.route('/request_time_off', methods=['GET', 'POST'])
+def request_time_off():
+    if 'user' not in session:
+        flash('You need to log in to request time off.', 'danger')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        date_str = request.form.get('date')
+        period = request.form.get('period')
+
+        try:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+            return redirect(url_for('request_time_off'))
+
+        user = Users.query.filter_by(name=session['user']).first()
+        if user:
+            new_request = TimeOffRequest(user_id=user.id, date=date_obj, period=period)
+            db.session.add(new_request)
+            db.session.commit()
+            flash('Time off request submitted successfully.', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('User not found.', 'danger')
+            return redirect(url_for('login'))
+
+    return render_template('request_time_off.html')
 
 
 @app.route('/reset_db')
@@ -147,6 +181,4 @@ def reset_db():
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)

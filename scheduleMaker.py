@@ -91,17 +91,104 @@ def generate_schedule(df):
 
     return df
 
+# Adjust the schedule for specific days
+def adjust_schedule(df):
+    days_to_adjust = ['Tuesday', 'Wednesday', 'Thursday']
+    friday = 'Friday'
+    saturday = 'Saturday'
+    sunday = 'Sunday'
+    morning_shift = '10:30-3:30'
+    afternoon_shift = '3:30-8'
+    early_morning_shift = '10:15-3:30'
+    normal_morning_shift = '10:30-3:30'
+    friday_early_morning_shift = '10:15-4'
+    friday_normal_morning_shift = '10:30-4'
+    friday_afternoon_shift = '4:00-9'
+    saturday_early_morning_shift = '10:00-3:30'
+    saturday_normal_morning_shift = '10:15-3:30'
+    sunday_early_morning_shift = '10:30-3:30'
+    sunday_normal_morning_shift = '10:45-3:30'
+    additional_shift = '1:00-6:00'
+
+    # Print column names for debugging
+    print("Columns in the DataFrame:", df.columns)
+
+    # Adjust Tuesday, Wednesday, and Thursday
+    for day in days_to_adjust:
+        if day in df.columns:
+            morning_shift_count = 0
+            for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+                if df.at[idx, day] == normal_morning_shift and morning_shift_count < 3:
+                    df.at[idx, day] = early_morning_shift
+                    morning_shift_count += 1
+
+    # Adjust Friday
+    if friday in df.columns:
+        morning_shift_count = 0
+        for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+            if df.at[idx, friday] == normal_morning_shift:
+                if morning_shift_count < 3:
+                    df.at[idx, friday] = friday_early_morning_shift
+                    morning_shift_count += 1
+                else:
+                    df.at[idx, friday] = friday_normal_morning_shift
+            elif df.at[idx, friday] == afternoon_shift:
+                df.at[idx, friday] = friday_afternoon_shift
+
+        # Add additional shift if there's an available slot
+        for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+            if df.at[idx, friday] == 'OFF':
+                df.at[idx, friday] = additional_shift
+                break
+
+    # Adjust Saturday
+    if saturday in df.columns:
+        morning_shift_count = 0
+        for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+            if df.at[idx, saturday] == normal_morning_shift:
+                if morning_shift_count < 3:
+                    df.at[idx, saturday] = saturday_early_morning_shift
+                    morning_shift_count += 1
+                else:
+                    df.at[idx, saturday] = saturday_normal_morning_shift
+
+        # Add additional shift if there's an available slot
+        for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+            if df.at[idx, saturday] == 'OFF':
+                df.at[idx, saturday] = additional_shift
+                break
+
+    # Adjust Sunday
+    if sunday in df.columns:
+        morning_shift_count = 0
+        for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+            if df.at[idx, sunday] == normal_morning_shift:
+                if morning_shift_count < 3:
+                    df.at[idx, sunday] = sunday_early_morning_shift
+                    morning_shift_count += 1
+                else:
+                    df.at[idx, sunday] = sunday_normal_morning_shift
+
+        # Add additional shift if there's an available slot
+        for idx in range(3, len(df)):  # Start from the 4th row (index 3)
+            if df.at[idx, sunday] == 'OFF':
+                df.at[idx, sunday] = additional_shift
+                break
+
+    return df
+
 def main():
     input_file = 'schedule.xlsx'
     output_file = 'updated_schedule.xlsx'
 
     df = read_excel(input_file)
     updated_df = generate_schedule(df)
+    adjusted_df = adjust_schedule(updated_df)
 
     # Drop the 'rank' column from the DataFrame
-    updated_df.drop(columns=['Rank'], inplace=True)
+    adjusted_df.drop(columns=['Rank'], inplace=True)
 
-    save_excel(updated_df, output_file)
+    save_excel(adjusted_df, output_file)
 
 if __name__ == "__main__":
     main()

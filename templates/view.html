@@ -5,8 +5,15 @@
 {% block content %}
     <h2>View Users</h2>
     <ul>
-        {% for user in values %}
-            <li>{{ user.name }} - {{ user.email }}</li>
+        {% for user in users %}
+            <li>
+                <strong>{{ user.name }}</strong> - {{ user.email }}
+                <ul>
+                    {% for request in user.time_off_requests %}
+                        <li>{{ request.date }} - {{ request.period }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
         {% endfor %}
     </ul>
 {% endblock %}
