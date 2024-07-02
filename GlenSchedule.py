@@ -1,15 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import timedelta, datetime
 from flask_sqlalchemy import SQLAlchemy
-import pandas as pd
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
+import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "hello"
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.permanent_session_lifetime = timedelta(days=5)
+app.permanent_session_lifetime = timedelta(hours=12)
 
 db = SQLAlchemy(app)
 
@@ -17,11 +17,13 @@ db = SQLAlchemy(app)
 class Users(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(100), nullable=False, unique=True)
+    email = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(100), nullable=False)
 
-    def __init__(self, name, email, password):
+    def __init__(self, name, username, email, password):
         self.name = name
+        self.username = username
         self.email = email
         self.password = generate_password_hash(password)
 
@@ -37,7 +39,12 @@ class TimeOffRequest(db.Model):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if 'user' in session:
+        username = session['user']
+        user = Users.query.filter_by(username=username).first()
+        return render_template('index.html', user=user)  # Pass the user object to the template
+    else:
+        return render_template('index.html')
 
 
 @app.route('/schedule')
@@ -68,9 +75,9 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        user = Users.query.filter_by(name=username).first()
+        user = Users.query.filter_by(username=username).first()
         if user and check_password_hash(user.password, password):
-            session['user'] = user.name
+            session['user'] = user.username  # Store username in session
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
@@ -83,19 +90,28 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        name = request.form.get('name')
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
         email = request.form.get('email')
         password = request.form.get('password')
+        username = request.form.get('username')
 
-        if not name or not email or not password:
+        if not first_name or not last_name or not email or not password or not username:
             flash('All fields are required.', 'error')
             return redirect(url_for('register'))
 
-        if Users.query.filter_by(name=name).first():
-            flash('Username already exists!', 'error')
+
+        full_name = f"{first_name} {last_name}"
+
+        if Users.query.filter_by(username=username).first():
+            flash('Username already exists!', 'danger')
             return redirect(url_for('register'))
 
-        new_user = Users(name, email, password)
+        if Users.query.filter_by(email=email).first():
+            flash('Email address already registered!', 'danger')
+            return redirect(url_for('register'))
+
+        new_user = Users(username=username, name=full_name, email=email, password=password)
         db.session.add(new_user)
         db.session.commit()
         flash('You have been registered successfully!', 'success')
@@ -110,7 +126,8 @@ def user():
         flash('You need to log in to view this page.', 'danger')
         return redirect(url_for('login'))
 
-    user = Users.query.filter_by(name=session['user']).first()
+    username = session['user']
+    user = Users.query.filter_by(username=username).first()
 
     if request.method == 'POST':
         email = request.form['email']
@@ -145,31 +162,52 @@ def delete():
 @app.route('/request_time_off', methods=['GET', 'POST'])
 def request_time_off():
     if 'user' not in session:
-        flash('You need to log in to request time off.', 'danger')
+        flash('You need to log in to view this page.', 'danger')
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        date_str = request.form.get('date')
-        period = request.form.get('period')
+        date = request.form['date']
+        period = request.form['period']
 
+        # Convert date to a datetime object for storage (if needed)
         try:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+            date = datetime.strptime(date, '%Y-%m-%d').date()
         except ValueError:
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('request_time_off'))
 
-        user = Users.query.filter_by(name=session['user']).first()
+        username = session['user']
+        user = Users.query.filter_by(username=username).first()
+
         if user:
-            new_request = TimeOffRequest(user_id=user.id, date=date_obj, period=period)
+            new_request = TimeOffRequest(user_id=user.id, date=date, period=period)
             db.session.add(new_request)
             db.session.commit()
+
             flash('Time off request submitted successfully.', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('request_time_off'))
         else:
             flash('User not found.', 'danger')
-            return redirect(url_for('login'))
+            return redirect(url_for('request_time_off'))
 
     return render_template('request_time_off.html')
+
+@app.route('/delete_time_off/<int:time_off_id>', methods=['POST'])
+def delete_time_off(time_off_id):
+    if 'user' not in session:
+        flash('You need to log in to perform this action.', 'danger')
+        return redirect(url_for('login'))
+
+    time_off_request = TimeOffRequest.query.get(time_off_id)
+    if not time_off_request:
+        flash('Time off request not found.', 'danger')
+    else:
+        db.session.delete(time_off_request)
+        db.session.commit()
+        flash('Time off request deleted successfully.', 'success')
+
+    return redirect(url_for('user'))
+
 
 
 @app.route('/reset_db')

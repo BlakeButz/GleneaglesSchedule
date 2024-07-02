@@ -1,20 +1,40 @@
 {% extends "base.html" %}
-
-{% block title %}User{% endblock %}
+{% block title %}User Profile{% endblock %}
 {% block content %}
-    <h2>User Page</h2>
-    <p>Username: {{ user.name }}</p>
-    <p>Email: {{ user.email }}</p>
-    <form method="POST" action="/user">
-        <label for="email">Update Email:</label>
-        <input type="email" id="email" name="email" required><br>
-        <button type="submit">Update</button>
+<div class="container">
+    <h2>Welcome, {{ user.name }}!</h2>
+    <h3>Your Email: {{ user.email }}</h3>
+
+    <h3>Time Off Requests</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Period</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for request in time_off_requests %}
+            <tr>
+                <td>{{ request.date }}</td>
+                <td>{{ request.period }}</td>
+                <td>
+                    <form action="{{ url_for('delete_time_off', time_off_id=request.id) }}" method="post">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <form method="POST" action="{{ url_for('user') }}">
+        <div class="form-group">
+            <label for="email">Update Email:</label>
+            <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Email</button>
     </form>
-    <h3>Dates Requested Off:</h3>
-    <ul>
-        {% for request in user.time_off_requests %}
-            <li>{{ request.date }} - {{ request.period }}</li>
-        {% endfor %}
-    </ul>
-    <a href="{{ url_for('logout') }}">Logout</a>
+</div>
 {% endblock %}

@@ -7,7 +7,7 @@
     <ul>
         {% for user in users %}
             <li>
-                <strong>{{ user.name }}</strong> - {{ user.email }}
+                <strong>{{ user.username }}</strong> - {{ user.email }}
                 <ul>
                     {% for request in user.time_off_requests %}
                         <li>{{ request.date }} - {{ request.period }}</li>

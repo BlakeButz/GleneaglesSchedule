@@ -3,14 +3,66 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
+<div class="container">
     <h2>Register</h2>
-    <form method="POST" action="/register">
-        <label for="name">Username:</label>
-        <input type="text" id="name" name="name" required><br>
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required><br>
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required><br>
-        <button type="submit">Register</button>
+    <form method="POST" action="{{ url_for('register') }}" id="registrationForm">
+        <div class="form-group">
+            <label for="first_name">First Name:</label>
+            <input type="text" id="first_name" name="first_name" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="last_name">Last Name:</label>
+            <input type="text" id="last_name" name="last_name" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" class="form-control" required pattern="^(?!.*[.]{2})(?!.*[.\-_']$)[a-zA-Z0-9\-_'\.]{1,64}$">
+            <div class="invalid-feedback">
+                Invalid username format. Usernames can contain letters (a-z, A-Z), numbers (0-9), dashes (-), underscores (_), apostrophes ('), and periods (.). They cannot contain more than one period (.) in a row or end with a period.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Register</button>
     </form>
+    <a href="{{ url_for('login') }}">Already have an account? Login here.</a>
+</div>
+
+<script>
+    document.getElementById('registrationForm').addEventListener('submit', function(event) {
+        var username = document.getElementById('username');
+        var regex = /^(?!.*[.]{2})(?!.*[.\-_']$)[a-zA-Z0-9\-_'\.]{1,64}$/;
+        if (!regex.test(username.value)) {
+            event.preventDefault();
+            username.classList.add('is-invalid');
+            username.nextElementSibling.style.display = 'block';
+            return false; // Prevent default and stop further execution
+        } else {
+            username.classList.remove('is-invalid');
+            username.nextElementSibling.style.display = 'none';
+            return true; // Proceed with form submission
+        }
+    });
+
+    // Reset validation on input change
+    document.getElementById('username').addEventListener('input', function() {
+        var username = document.getElementById('username');
+        var regex = /^(?!.*[.]{2})(?!.*[.\-_']$)[a-zA-Z0-9\-_'\.]{1,64}$/;
+        if (regex.test(username.value)) {
+            username.classList.remove('is-invalid');
+            username.nextElementSibling.style.display = 'none';
+        }
+    });
+</script>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
 {% endblock %}

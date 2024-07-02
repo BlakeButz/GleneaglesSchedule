@@ -2,9 +2,9 @@
 {% block title %}Home{% endblock %}
 {% block content %}
     {% if 'user' in session %}
-        <h2>Welcome, {{ session['user'] }}!</h2>
+        <h2>Welcome, {{ user.name }}!</h2>
         <p>Would you like to <a href="{{ url_for('request_time_off') }}">request time off</a>?</p>
-        <p>Would you like to <a href="{{ url_for('user') }}">view your time off</a>?</p>
+        <p>Would you like to <a href="{{ url_for('user') }}">view your profile</a>?</p>
         <p>Would you like to <a href="{{ url_for('schedule') }}">view the schedule</a>?</p>
     {% else %}
         <h2>Welcome to the Time Off Request System</h2>
