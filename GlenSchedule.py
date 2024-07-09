@@ -53,6 +53,10 @@ def index():
 
 @app.route('/schedule')
 def schedule():
+    if 'user' not in session:
+        flash('You need to log in to view this page.', 'danger')
+        return redirect(url_for('login'))
+
     file_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'updated_schedule.xlsx')
     try:
         df = pd.read_excel(file_path)
@@ -60,10 +64,10 @@ def schedule():
     except FileNotFoundError as e:
         print(e)  # Print the error to help with debugging
         data = "File not found."
-    if 'user' in session:
-        is_admin = user.is_admin
-    else:
-        is_admin = False
+
+    username = session['user']
+    user = Users.query.filter_by(username=username).first()
+    is_admin = user.is_admin
     return render_template('schedule.html', data=data, is_admin=is_admin)
 
 
@@ -92,6 +96,10 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if 'user' in session:
+        flash('You are already logged in!', 'info')
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         first_name = request.form.get('first_name')
         last_name = request.form.get('last_name')
@@ -163,7 +171,9 @@ def request_time_off():
         flash('You need to log in to view this page.', 'danger')
         return redirect(url_for('login'))
 
-
+    username = session['user']
+    user = Users.query.filter_by(username=username).first()
+    is_admin = user.is_admin
 
     if request.method == 'POST':
         date = request.form['date']
@@ -175,9 +185,7 @@ def request_time_off():
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('request_time_off'))
 
-        username = session['user']
-        user = Users.query.filter_by(username=username).first()
-        is_admin = user.is_admin
+
 
         new_request = TimeOffRequest(user_id=user.id, date=date, period=period)
         db.session.add(new_request)
@@ -186,7 +194,7 @@ def request_time_off():
         flash('Time off request submitted successfully.', 'success')
         return redirect(url_for('request_time_off'))
 
-    return render_template('request_time_off.html')
+    return render_template('request_time_off.html', is_admin=is_admin)
 
 @app.route('/delete_time_off/<int:time_off_id>', methods=['POST'])
 def delete_time_off(time_off_id):
@@ -226,7 +234,9 @@ def admin():
         ]
         user_data.append({'user': user, 'time_off_requests': formatted_requests})
 
-    return render_template('admin.html', user_data=user_data)
+    return render_template('admin.html', user_data=user_data, is_admin=user.is_admin)
+
+
 
 @app.route('/delete_user/<int:user_id>', methods=['POST'])
 def delete_user(user_id):
@@ -251,7 +261,6 @@ def delete_user(user_id):
     db.session.commit()
     flash('User deleted successfully.', 'success')
     return redirect(url_for('admin'))
-
 
 
 @app.route('/reset_db')
