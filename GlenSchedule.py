@@ -20,12 +20,15 @@ class Users(db.Model):
     username = db.Column(db.String(100), nullable=False, unique=True)
     email = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(100), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
 
-    def __init__(self, name, username, email, password):
+    def __init__(self, name, username, email, password, is_admin=False):
         self.name = name
         self.username = username
         self.email = email
         self.password = generate_password_hash(password)
+        self.is_admin = is_admin
+
 
 
 class TimeOffRequest(db.Model):
@@ -42,7 +45,8 @@ def index():
     if 'user' in session:
         username = session['user']
         user = Users.query.filter_by(username=username).first()
-        return render_template('index.html', user=user)  # Pass the user object to the template
+        is_admin = user.is_admin
+        return render_template('index.html', user=user, is_admin=is_admin)  # Pass the user object to the template
     else:
         return render_template('index.html')
 
@@ -56,13 +60,12 @@ def schedule():
     except FileNotFoundError as e:
         print(e)  # Print the error to help with debugging
         data = "File not found."
-    return render_template('schedule.html', data=data)
+    if 'user' in session:
+        is_admin = user.is_admin
+    else:
+        is_admin = False
+    return render_template('schedule.html', data=data, is_admin=is_admin)
 
-
-@app.route("/view")
-def view():
-    users = Users.query.all()
-    return render_template("view.html", users=users)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -100,7 +103,6 @@ def register():
             flash('All fields are required.', 'error')
             return redirect(url_for('register'))
 
-
         full_name = f"{first_name} {last_name}"
 
         if Users.query.filter_by(username=username).first():
@@ -111,13 +113,17 @@ def register():
             flash('Email address already registered!', 'danger')
             return redirect(url_for('register'))
 
-        new_user = Users(username=username, name=full_name, email=email, password=password)
+        # Check if this is the first user to be registered
+        is_admin = Users.query.count() == 0
+
+        new_user = Users(name=full_name, username=username, email=email, password=password, is_admin=is_admin)
         db.session.add(new_user)
         db.session.commit()
         flash('You have been registered successfully!', 'success')
         return redirect(url_for('login'))
 
     return render_template('register.html')
+
 
 
 @app.route('/user', methods=['GET', 'POST'])
@@ -136,8 +142,12 @@ def user():
         flash('Email updated successfully.', 'success')
 
     time_off_requests = TimeOffRequest.query.filter_by(user_id=user.id).all()
+    formatted_requests = [
+        {'id': request.id, 'date': request.date.strftime('%m-%d-%Y'), 'period': request.period} for request in time_off_requests
+    ]
 
-    return render_template('user.html', user=user, time_off_requests=time_off_requests)
+
+    return render_template('user.html', user=user, time_off_requests=formatted_requests, is_admin = user.is_admin)
 
 
 @app.route('/logout')
@@ -147,29 +157,18 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/delete', methods=['GET', 'POST'])
-def delete():
-    for time in TimeOffRequest.query.all():
-        db.session.delete(time)
-    for user in Users.query.all():
-        db.session.delete(user)
-    db.session.commit()
-    flash('Users Deleted!', 'info')
-
-    return redirect(url_for('logout'))
-
-
 @app.route('/request_time_off', methods=['GET', 'POST'])
 def request_time_off():
     if 'user' not in session:
         flash('You need to log in to view this page.', 'danger')
         return redirect(url_for('login'))
 
+
+
     if request.method == 'POST':
         date = request.form['date']
         period = request.form['period']
 
-        # Convert date to a datetime object for storage (if needed)
         try:
             date = datetime.strptime(date, '%Y-%m-%d').date()
         except ValueError:
@@ -178,17 +177,14 @@ def request_time_off():
 
         username = session['user']
         user = Users.query.filter_by(username=username).first()
+        is_admin = user.is_admin
 
-        if user:
-            new_request = TimeOffRequest(user_id=user.id, date=date, period=period)
-            db.session.add(new_request)
-            db.session.commit()
+        new_request = TimeOffRequest(user_id=user.id, date=date, period=period)
+        db.session.add(new_request)
+        db.session.commit()
 
-            flash('Time off request submitted successfully.', 'success')
-            return redirect(url_for('request_time_off'))
-        else:
-            flash('User not found.', 'danger')
-            return redirect(url_for('request_time_off'))
+        flash('Time off request submitted successfully.', 'success')
+        return redirect(url_for('request_time_off'))
 
     return render_template('request_time_off.html')
 
@@ -207,6 +203,54 @@ def delete_time_off(time_off_id):
         flash('Time off request deleted successfully.', 'success')
 
     return redirect(url_for('user'))
+
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+    if 'user' not in session:
+        flash('You need to log in to view this page.', 'danger')
+        return redirect(url_for('login'))
+
+    username = session['user']
+    user = Users.query.filter_by(username=username).first()
+
+    if not user.is_admin:
+        flash('You do not have permission to view this page.', 'danger')
+        return redirect(url_for('index'))
+
+    users = Users.query.all()
+    user_data = []
+    for user in users:
+        time_off_requests = TimeOffRequest.query.filter_by(user_id=user.id).all()
+        formatted_requests = [
+            {'id': request.id, 'date': request.date.strftime('%m-%d-%Y'), 'period': request.period} for request in time_off_requests
+        ]
+        user_data.append({'user': user, 'time_off_requests': formatted_requests})
+
+    return render_template('admin.html', user_data=user_data)
+
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    if 'user' not in session:
+        flash('You need to log in to perform this action.', 'danger')
+        return redirect(url_for('login'))
+
+    current_user = Users.query.filter_by(username=session['user']).first()
+    if not current_user.is_admin:
+        flash('You do not have permission to perform this action.', 'danger')
+        return redirect(url_for('index'))
+
+    user_to_delete = Users.query.get(user_id)
+    if not user_to_delete:
+        flash('User not found.', 'danger')
+        return redirect(url_for('admin'))
+
+    # Delete user's time off requests
+    TimeOffRequest.query.filter_by(user_id=user_id).delete()
+
+    db.session.delete(user_to_delete)
+    db.session.commit()
+    flash('User deleted successfully.', 'success')
+    return redirect(url_for('admin'))
 
 
 

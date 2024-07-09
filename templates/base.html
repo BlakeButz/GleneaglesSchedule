@@ -24,12 +24,6 @@
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('view') }}">View</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('delete') }}">Delete</a>
-      </li>
-      <li class="nav-item">
         <a class="nav-link" href="{{ url_for('register') }}">Register</a>
       </li>
       <li class="nav-item">
@@ -41,6 +35,11 @@
       <li class="nav-item">
         <a class="nav-link" href="{{ url_for('user') }}">View Time Off</a>
       </li>
+      {% if is_admin %}
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('admin') }}">Admin</a>
+      </li>
+      {% endif %}
     </ul>
   </div>
 </nav>
